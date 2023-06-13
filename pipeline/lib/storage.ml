@@ -181,8 +181,10 @@ let get_main_branch_metrics ~repository ~worker ~docker_image
        |}
   in
   let query = query_tmpl main_commit repo_id worker docker_image in
+  Logs.info (fun log -> log "Query for getting main results:%s\n" query);
   let result_main = db#exec query in
   let query = query_tmpl commit repo_id worker docker_image in
+  Logs.info (fun log -> log "Query for getting branch results:%s\n" query);
   let result = db#exec query in
   match (result_main#get_all, result#get_all) with
   | result_main, result ->

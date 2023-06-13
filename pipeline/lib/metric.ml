@@ -63,13 +63,18 @@ type change = Change of float | New
 
 let find_changed_metrics ~metrics ~compare_metrics =
   BenchmarksData.merge
-    (fun _ (value : Cb_schema.S.value option)
+    (fun (key1, key2, key3) (value : Cb_schema.S.value option)
          (compare_value : Cb_schema.S.value option) ->
       match (value, compare_value) with
       | Some value, Some compare_value ->
           let delta =
             calc_diff (avg_of_value value) (avg_of_value compare_value)
           in
+          Logs.info (fun log ->
+              log "Key: %s+%s+%s; value1: %f, value2: %f; delta: %f" key1 key2
+                key3 (avg_of_value value)
+                (avg_of_value compare_value)
+                delta);
           if Float.abs delta > change_threshold
           then Some (Change delta)
           else None
@@ -241,6 +246,10 @@ module NotifyGithub = struct
         in
         let metrics, _ = parse_benchmark_data ~data:result in
         let changes = find_changed_metrics ~metrics ~compare_metrics in
+        Logs.info (fun log ->
+            log "Changes?... %s"
+              (Option.value ~default:"Unknown hash" main_commit));
+
         match github_api with
         | Some api when not (BenchmarksData.is_empty changes) ->
             let text =
@@ -248,6 +257,7 @@ module NotifyGithub = struct
                 ~main_commit
             in
             let () = post_github_comment ~api ~repository ~pull_number ~text in
+            Logs.info (fun log -> log "Changes TEXT: %s" text);
             Lwt.return (Ok text)
         | Some _ -> Lwt.return (Ok "No changes found in metric comparison")
         | _ -> Lwt.return (Ok "No Github API configuration found"))
